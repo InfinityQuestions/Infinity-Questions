@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinity Questions ∞</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+            background-color: black;
+            color: limegreen;
+        }
+        #quiz-container {
+            display: none;
+        }
+        #leaderboard {
+            margin-top: 20px;
+            border: 1px solid limegreen;
+            padding: 10px;
+            width: 50%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .feedback {
+            font-size: 24px;
+            margin-top: 10px;
+        }
+        .correct-answer {
+            color: red;
+            font-size: 18px;
+            margin-top: 10px;
+        }
+        input, select, button {
+            background-color: black;
+            color: limegreen;
+            border: 1px solid limegreen;
+            padding: 5px;
+            margin: 5px;
+        }
+        button {
+            cursor: pointer;
+        }
+        .infinity-symbol {
+            font-size: 2em;
+            display: inline-block;
+            position: relative;
+            width: 1em;
+            height: 0.5em;
+        }
+        .infinity-symbol::before, .infinity-symbol::after {
+            content: '';
+            position: absolute;
+            width: 0.5em;
+            height: 0.5em;
+            border: 2px solid limegreen;
+            border-radius: 50%;
+        }
+        .infinity-symbol::before {
+            left: -0.25em;
+        }
+        .infinity-symbol::after {
+            right: -0.25em;
+        }
+        .infinity-symbol .i, .infinity-symbol .q {
+            position: absolute;
+            color: limegreen;
+            font-size: 0.4em;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .infinity-symbol .i {
+            left: 0.05em;
+        }
+        .infinity-symbol .q {
+            right: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Infinity Questions <span class="infinity-symbol"><span class="i">I</span><span class="q">Q</span></span></h1>
+    <label for="username">Enter Username:</label>
+    <input type="text" id="username" placeholder="Your name">
+    <br><br>
+    <label for="timer">Select Timer:</label>
+    <select id="timer">
+        <option value="300">5 Minutes</option>
+        <option value="600">10 Minutes</option>
+        <option value="900">15 Minutes</option>
+        <option value="1200">20 Minutes</option>
+    </select>
+    <button onclick="startQuiz()">Start Quiz</button>
+    
+    <div id="quiz-container">
+        <h2 id="question"></h2>
+        <input type="text" id="answer" placeholder="Type your answer here">
+        <button onclick="checkAnswer()">Submit Answer</button>
+        <p class="feedback" id="feedback"></p>
+        <p class="correct-answer" id="correct-answer"></p>
+        <p>Score: <span id="score">0</span></p>
+        <p>Time Left: <span id="time-left"></span> seconds</p>
+        <div id="leaderboard">
+            <h3>Leaderboard</h3>
+            <ul id="leaderboard-list"></ul>
+        </div>
+    </div>
+    
+    <script>
+        let timeLeft;
+        let timerInterval;
+        let score = 0;
+        let currentQuestion = "";
+        let correctAnswer = "";
+        
+        function startQuiz() {
+            const username = document.getElementById("username").value.trim();
+            if (!username) {
+                alert("Please enter a username to start the quiz.");
+                return;
+            }
+            
+            const selectedTime = document.getElementById("timer").value;
+            timeLeft = parseInt(selectedTime);
+            document.getElementById("quiz-container").style.display = "block";
+            document.querySelector("select").disabled = true;
+            document.querySelector("button").disabled = true;
+            getNewQuestion();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+        
+        function updateTimer() {
+            document.getElementById("time-left").innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                alert("Time's up! Quiz over.");
+                location.reload();
+            }
+            timeLeft--;
+        }
+        
+        async function getNewQuestion() {
+            const response = await fetch("https://opentdb.com/api.php?amount=1&type=multiple");
+            const data = await response.json();
+            const questionData = data.results[0];
+            
+            currentQuestion = decodeHTML(questionData.question);
+            correctAnswer = decodeHTML(questionData.correct_answer).toLowerCase();
+            document.getElementById("question").innerText = currentQuestion;
+            document.getElementById("correct-answer").innerText = "";
+        }
+        
+        function decodeHTML(html) {
+            const txt = document.createElement("textarea");
+            txt.innerHTML = html;
+            return txt.value;
+        }
+
+        function checkAnswer() {
+            const userAnswer = document.getElementById("answer").value.toLowerCase().trim();
+            const feedback = document.getElementById("feedback");
+            const correctAnswerDisplay = document.getElementById("correct-answer");
+            
+            if (levenshtein(userAnswer, correctAnswer) <= 2) {
+                score++;
+                document.getElementById("score").innerText = score;
+                updateLeaderboard();
+                feedback.innerHTML = "✔";
+                feedback.style.color = "green";
+                correctAnswerDisplay.innerText = "";
+            } else {
+                feedback.innerHTML = "✘";
+                feedback.style.color = "red";
+                correctAnswerDisplay.innerText = "Correct answer: " + correctAnswer;
+                score--;
+                if (score < 0) score = 0;
+                document.getElementById("score").innerText = score;
+            }
+            
+            document.getElementById("answer").value = "";
+            setTimeout(() => { feedback.innerHTML = ""; }, 1000);
+            setTimeout(() => { getNewQuestion(); }, 2000);
+        }
+        
+        function updateLeaderboard() {
+            const username = document.getElementById("username").value;
+            const leaderboardList = document.getElementById("leaderboard-list");
+            leaderboardList.innerHTML = "";
+            const listItem = document.createElement("li");
+            listItem.innerText = `${username} - Score: ${score}`;
+            leaderboardList.appendChild(listItem);
+        }
+        
+        function levenshtein(a, b) {
+            const dp = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+            for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+            for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+            for (let i = 1; i <= a.length; i++) {
+                for (let j = 1; j <= b.length; j++) {
+                    const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                    dp[i][j] = Math.min(
+                        dp[i - 1][j] + 1,
+                        dp[i][j - 1] + 1,
+                        dp[i - 1][j - 1] + cost
+                    );
+                }
+            }
+            return dp[a.length][b.length];
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && document.getElementById('quiz-container').style.display === 'block') {
+                checkAnswer();
+            }
+        });
+    </script>
+</body>
+</html>
